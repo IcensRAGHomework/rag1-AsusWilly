@@ -10,6 +10,9 @@ from langchain_core.output_parsers import JsonOutputParser
 gpt_chat_version = 'gpt-4o'
 gpt_config = get_model_configuration(gpt_chat_version)
 
+def format_json(data):
+    return json.dumps(data, indent=4, ensure_ascii=False)
+
 def generate_hw01(question):
     llm = AzureChatOpenAI(
             model=gpt_config['model_name'],
@@ -21,7 +24,7 @@ def generate_hw01(question):
     )
     llm.bind(response_format={"type": "json_object"})
     json_parser = JsonOutputParser()
-    format_instructions = json_parser.get_format_instructions()
+    format_instructions = '{{"Result": [{{ "date": "yyyy-MM-dd", "name": "節日" }}, {{ "date": "yyyy-MM-dd", "name": "節日" }}] }}'
 
     message = HumanMessage(
             content=[
@@ -29,7 +32,7 @@ def generate_hw01(question):
             ]
     )
     response = llm.invoke([question + f"{format_instructions}"])
-    json_output = json_parser.invoke(response)
+    json_output = format_json(json_parser.invoke(response))
     return json_output
     
 def generate_hw02(question):
