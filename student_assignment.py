@@ -23,16 +23,10 @@ def generate_hw01(question):
             temperature=gpt_config['temperature']
     )
     llm.bind(response_format={"type": "json_object"})
-    json_parser = JsonOutputParser()
     format_instructions = '{{"Result": [{{ "date": "yyyy-MM-dd", "name": "節日" }}, {{ "date": "yyyy-MM-dd", "name": "節日" }}] }}'
 
-    message = HumanMessage(
-            content=[
-                {"type": "text", "text": question},
-            ]
-    )
     response = llm.invoke([question + f"{format_instructions}"])
-    json_output = format_json(json_parser.invoke(response))
+    json_output = format_json(JsonOutputParser().invoke(response))
     return json_output
     
 def generate_hw02(question):
