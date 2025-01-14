@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv('my_enviroment.env')
 
 configurations = {
     "gpt-4o": {
