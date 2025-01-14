@@ -1,1 +1,5 @@
 .env
+.venv/
+__pycache__/
+get-pip.py
+my_enviroment.env
