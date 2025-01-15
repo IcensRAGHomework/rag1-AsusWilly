@@ -1,5 +1,4 @@
 import json
-import traceback
 
 from model_configurations import get_model_configuration
 
