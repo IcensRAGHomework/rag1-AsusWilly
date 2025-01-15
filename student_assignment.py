@@ -1,4 +1,5 @@
 import json
+import requests
 
 from model_configurations import get_model_configuration
 
@@ -24,8 +25,36 @@ llm = create_openai_model()
 def format_json(data):
     return json.dumps(data, indent=4, ensure_ascii=False)
 
+def get_holiday_from_calendarific(year, month, country):
+
+    API_KEY = "w9O94T1c8qE1Y2m3jgStYH27d1HgS0rF"
+    BASE_URL = "https://calendarific.com/api/v2/holidays"
+
+    params = {
+        "api_key": API_KEY,
+        "year": year,
+        "month": month,
+        "country": country
+    }
+    response = requests.get(BASE_URL, params=params)
+    # 檢查 API 響應狀態
+    if response.status_code == 200:
+        data = response.json()
+        holidays = data.get("response", {}).get("holidays", [])
+
+        # 篩選符合條件的節日（例如 Observance: 紀念日）
+        result = []
+        for holiday in holidays:
+            result.append({
+                "date": holiday["date"]["iso"],
+                "name": holiday["name"]
+             })
+        return {"Result": result}
+    else:
+        # 若出錯，返回錯誤訊息
+        return {"Error": f"API Error: {response.status_code}, {response.text}"}
+
 def generate_hw01(question):
-    llm.bind(response_format={"type": "json_object"})
     format_instructions = '{{"Result": [{{ "date": "yyyy-MM-dd", "name": "節日" }}, {{ "date": "yyyy-MM-dd", "name": "節日" }}] }}'
 
     response = llm.invoke([question + f"{format_instructions}"])
@@ -59,5 +88,6 @@ def demo(question):
     
     return response
 
-query = "2024年台灣10月紀念日有哪些?"
-print(generate_hw01(query))
+print(get_holiday_from_calendarific(2024, 10, "TW"))
+#query = "2024年台灣10月紀念日有哪些?"
+#print(generate_hw01(query))
