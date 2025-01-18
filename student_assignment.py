@@ -118,7 +118,7 @@ def generate_hw03(question2, question3):
     response = agent_with_memory.invoke(
         {'question': question3 + '是否需要將節日新增到節日清單中。根據問題判斷該節日是否存在於清單中，'
         + '如果不存在，則為 true；否則為 false，並描述為什麼需要或不需要新增節日，具體說明是否該節日已經存在於清單中，'
-        + '以及當前清單的內容。請用此 JSON 格式回答問題:{{ "Result": {{ "add": true, "reason": "描述" }} }}'},
+        + '以及當前清單的內容。答案請用此 JSON 格式呈現:{{ "Result": {{ "add": true, "reason": "描述" }} }}'},
         config={'session_id': session_id} 
     )
     return format_json(JsonOutputParser().invoke(response['output']))
@@ -135,7 +135,7 @@ def generate_hw04(question):
             {'type': 'image_url', 'image_url': { 'url': image_url}}
         ]
     )
-    request_message = '請用此 JSON 格式回答問題:{{ "Result": {{ "score": 5498 }} }}'
+    request_message = '答案請用此 JSON 格式呈現:{{ "Result": {{ "score": 5498 }} }}'
     messages = [text_message, image_message, request_message]
     response = llm.invoke(messages)
     return format_json(JsonOutputParser().invoke(response))
@@ -161,4 +161,4 @@ def demo(question):
 # print(generate_hw01('2024年台灣10月紀念日有哪些?'))
 # print(generate_hw02('2024年台灣10月紀念日有哪些?'))
 # print(generate_hw03('2024年台灣10月紀念日有哪些?', '根據先前的節日清單，這個節日{"date": "10-31", "name": "蔣公誕辰紀念日"}是否有在該月份清單?'))
-print(generate_hw04('請問中華台北的積分是多少'))
+# print(generate_hw04('請問中華台北的積分是多少'))
