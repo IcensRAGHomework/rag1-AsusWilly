@@ -4,9 +4,16 @@ import requests
 
 from model_configurations import get_model_configuration
 
+from langchain.agents import create_tool_calling_agent, AgentExecutor, Tool
+from langchain.memory import ConversationBufferMemory
+from langchain.prompts import PromptTemplate
 from langchain_openai import AzureChatOpenAI
+from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.tools import tool
+from langchain_core.runnables import RunnableWithMessageHistory
+from langchain.schema.runnable import RunnableLambda
 
 gpt_chat_version = 'gpt-4o'
 gpt_config = get_model_configuration(gpt_chat_version)
@@ -22,87 +29,92 @@ def create_openai_model():
     )
 
 llm = create_openai_model()
+format_instructions = '{{"Result": [{{ "date": "yyyy-MM-dd", "name": "節日" }}, {{ "date": "yyyy-MM-dd", "name": "節日" }}] }}'
 
 def format_json(data):
     return json.dumps(data, indent=4, ensure_ascii=False)
 
 def get_holidays_from_calendarific(year, month, country_code):
 
-    API_KEY = "w9O94T1c8qE1Y2m3jgStYH27d1HgS0rF"
-    BASE_URL = "https://calendarific.com/api/v2/holidays"
+    API_KEY = 'w9O94T1c8qE1Y2m3jgStYH27d1HgS0rF'
+    BASE_URL = 'https://calendarific.com/api/v2/holidays'
 
     params = {
-        "api_key": API_KEY,
-        "year": year,
-        "month": month,
-        "country": "TW",
-        "language": "zh"
+        'api_key': API_KEY,
+        'year': year,
+        'month': month,
+        'country': country_code
     }
-    return requests.get(BASE_URL, params=params)
-    
-def extract_info_from_question(question):
-    response = llm.invoke([
-        {"role": "system", "content": "你是一個專門提取問題資訊的助理，返回結構化的 JSON 格式，包含年份、月份和國家。"},
-        {"role": "user", "content": f"請根據以下問題提取資訊，並返回 JSON 格式，包含三個鍵值：\n"
-                                    f"- 'year': 問題中的年份（若無，填寫 null）\n"
-                                    f"- 'month': 問題中的月份（若無，填寫 null）\n"
-                                    f"- 'country': 問題中的國家代碼(ISO 3166-1 alpha-2)\n\n"
-                                    f"問題: '{question}'"}
-    ])
-    
-    try:
-        json_match = re.search(r"{.*}", response.content, re.DOTALL)
-        if json_match:
-            clean_json = json_match.group()
-            parsed_result = json.loads(clean_json)
-
-            result = {
-                "year": parsed_result.get("year", None),
-                "month": parsed_result.get("month", None),
-                "country": parsed_result.get("country", None)
-            }
-            return result
-
-    except Exception as e:
-        print(f"Error: {e}")
-        return None
-    
-def get_holiday_info(question):
-
-    extracted_info = extract_info_from_question(question)
-
-    if extracted_info and all(extracted_info[key] is not None for key in ['year', 'month', 'country']):
-
-        year = extracted_info['year']
-        month = extracted_info['month']
-        country = extracted_info['country']
-
-        holidays_data = get_holidays_from_calendarific(year, month, country).json()
-        result = {
-            "Result": [
-                {
-                    "date": holiday["date"]["iso"],
-                    "name": holiday["name"]
-                }
-                for holiday in holidays_data["response"]["holidays"]
-            ]
-        }
-        return format_json(result)
+    response = requests.get(BASE_URL, params=params)
+    if response.status_code == 200:
+        return response.json()
     else:
-        return "無法從問題中知道有效年份、月份或國家"
+        return {'error': f'API request failed with status {response.status_code}'}
+
+@tool
+def holidays_tool(country_code, year, month):
+    '獲取某國家某年某月的紀念日。country_code 為國家代碼(ISO 3166-1 alpha-2)。year 為年。month 為月'
+    holidays_data = get_holidays_from_calendarific(year, month, country_code)
+
+    if 'error' in holidays_data:
+        return holidays_data['error']
+
+    result = [
+        {
+            'date': holiday['date']['iso'],
+            'name': holiday['name']
+        }
+        for holiday in holidays_data.get('response', {}).get('holidays', [])
+    ]
+
+    return result
+    
+def get_holiday_info_with_agent(question):
+    prompt_template = PromptTemplate(
+        input_variables = ['question', 'agent_scratchpad'],
+        template = '{question}' + format_instructions + '\nAgent Scratchpad: {agent_scratchpad}'
+    )
+    agent = create_tool_calling_agent(llm, [holidays_tool], prompt_template)
+    response = AgentExecutor(
+        agent= agent,
+        tools = [holidays_tool],
+        verbose =False
+    ).invoke({'question': question}) 
+    return response
 
 def generate_hw01(question):
-    format_instructions = '{{"Result": [{{ "date": "yyyy-MM-dd", "name": "節日" }}, {{ "date": "yyyy-MM-dd", "name": "節日" }}] }}'
-
-    response = llm.invoke([question + f"{format_instructions}"])
-    json_output = format_json(JsonOutputParser().invoke(response))
-    return json_output
+    response = llm.invoke([question + f'{format_instructions}'])
+    return format_json(JsonOutputParser().invoke(response))
     
 def generate_hw02(question):
-    return get_holiday_info(question)
-    
+    response = get_holiday_info_with_agent(question)
+    return format_json(JsonOutputParser().invoke(response['output']))
+
+session_memories = {}
+
+def get_session_history(session_id):
+    if session_id not in session_memories:
+        session_memories[session_id] = InMemoryChatMessageHistory()
+    return session_memories[session_id]
+
 def generate_hw03(question2, question3):
-    pass
+    holiday_agent_runnable = RunnableLambda(get_holiday_info_with_agent)
+    agent_with_memory = RunnableWithMessageHistory(
+        runnable = holiday_agent_runnable,
+        get_session_history = get_session_history
+    )
+    session_id = 'user-session' 
+    response = agent_with_memory.invoke(
+        {'question': question2 + f'{format_instructions}'},
+        config={'session_id': session_id} 
+    )
+
+    response = agent_with_memory.invoke(
+        {'question': question3 + f'是否需要將節日新增到節日清單中。根據問題判斷該節日是否存在於清單中，如果不存在，則為 true；否則為 false，並描述為什麼需要或不需要新增節日，具體說明是否該節日已經存在於清單中，以及當前清單的內容。答案請用此 JSON 格式呈現:{{ "Result": {{ "add": true, "reason": "描述" }} }}'},
+        config={'session_id': session_id} 
+    )
+
+    return format_json(JsonOutputParser().invoke(response['output']))
     
 def generate_hw04(question):
     pass
@@ -125,8 +137,6 @@ def demo(question):
     
     return response
 
-# print(get_holiday_from_calendarific(2024, 10, "TW"))
-# query = "2024年台灣10月紀念日有哪些?"
-# print(generate_hw01(query))
-query = "2024年台灣10月紀念日有哪些?"
-print(generate_hw02(query))
+# print(generate_hw01('2024年台灣10月紀念日有哪些?'))
+# print(generate_hw02('2024年台灣10月紀念日有哪些?'))
+print(generate_hw03('2024年台灣10月紀念日有哪些?', '根據先前的節日清單，這個節日{"date": "10-31", "name": "蔣公誕辰紀念日"}是否有在該月份清單?'))
