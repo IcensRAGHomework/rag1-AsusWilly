@@ -32,7 +32,10 @@ llm = create_openai_model()
 format_instructions = '{{"Result": [{{ "date": "yyyy-MM-dd", "name": "節日" }}, {{ "date": "yyyy-MM-dd", "name": "節日" }}] }}'
 
 def format_json(data):
-    return json.dumps(data, indent=4, ensure_ascii=False)
+    formatted = json.dumps(data, indent=4, ensure_ascii=False)
+    formatted = formatted.replace('"Result": {', '"Result":\n        {')
+    formatted = formatted.replace('\n    }', '\n        }')
+    return formatted
 
 def get_holidays_from_calendarific(year, month, country_code):
 
@@ -110,10 +113,11 @@ def generate_hw03(question2, question3):
     )
 
     response = agent_with_memory.invoke(
-        {'question': question3 + f'是否需要將節日新增到節日清單中。根據問題判斷該節日是否存在於清單中，如果不存在，則為 true；否則為 false，並描述為什麼需要或不需要新增節日，具體說明是否該節日已經存在於清單中，以及當前清單的內容。答案請用此 JSON 格式呈現:{{ "Result": {{ "add": true, "reason": "描述" }} }}'},
+        {'question': question3 + '是否需要將節日新增到節日清單中。根據問題判斷該節日是否存在於清單中，'
+        + '如果不存在，則為 true；否則為 false，並描述為什麼需要或不需要新增節日，具體說明是否該節日已經存在於清單中，'
+        + '以及當前清單的內容。答案請用此 JSON 格式呈現:{{ "Result": {{ "add": true, "reason": "描述" }} }}'},
         config={'session_id': session_id} 
     )
-
     return format_json(JsonOutputParser().invoke(response['output']))
     
 def generate_hw04(question):
@@ -137,6 +141,6 @@ def demo(question):
     
     return response
 
-# print(generate_hw01('2024年台灣10月紀念日有哪些?'))
-# print(generate_hw02('2024年台灣10月紀念日有哪些?'))
+#print(generate_hw01('2024年台灣10月紀念日有哪些?'))
+#print(generate_hw02('2024年台灣10月紀念日有哪些?'))
 print(generate_hw03('2024年台灣10月紀念日有哪些?', '根據先前的節日清單，這個節日{"date": "10-31", "name": "蔣公誕辰紀念日"}是否有在該月份清單?'))
