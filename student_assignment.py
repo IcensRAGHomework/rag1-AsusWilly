@@ -100,7 +100,7 @@ def generate_hw01(question):
     return format_json(JsonOutputParser().invoke(response))
     
 def generate_hw02(question):
-    response = get_holiday_info_with_agent(question + '，並請用繁體中文回答節日名稱')
+    response = get_holiday_info_with_agent(question)
     return format_json(JsonOutputParser().invoke(response['output']))
 
 def generate_hw03(question2, question3):
@@ -158,7 +158,7 @@ def demo(question):
     
     return response
 
-print(generate_hw01('2024年台灣10月紀念日有哪些?'))
-print(generate_hw02('2024年台灣10月紀念日有哪些?'))
-print(generate_hw03('2024年台灣10月紀念日有哪些?', '根據先前的節日清單，這個節日{"date": "10-31", "name": "蔣公誕辰紀念日"}是否有在該月份清單?'))
-print(generate_hw04('請問中華台北的積分是多少'))
+# print(generate_hw01('2024年台灣10月紀念日有哪些?'))
+# print(generate_hw02('2024年台灣10月紀念日有哪些?'))
+# print(generate_hw03('2024年台灣10月紀念日有哪些?', '根據先前的節日清單，這個節日{"date": "10-31", "name": "蔣公誕辰紀念日"}是否有在該月份清單?'))
+# print(generate_hw04('請問中華台北的積分是多少'))
