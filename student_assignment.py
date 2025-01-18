@@ -1,3 +1,4 @@
+import base64
 import json
 import re
 import requests
@@ -30,11 +31,12 @@ def create_openai_model():
 
 llm = create_openai_model()
 format_instructions = '{{"Result": [{{ "date": "yyyy-MM-dd", "name": "節日" }}, {{ "date": "yyyy-MM-dd", "name": "節日" }}] }}'
+session_memories = {}
 
 def format_json(data):
     formatted = json.dumps(data, indent=4, ensure_ascii=False)
-    formatted = formatted.replace('"Result": {', '"Result":\n        {')
-    formatted = formatted.replace('\n    }', '\n        }')
+    #formatted = formatted.replace('"Result": {', '"Result":\n        {')
+    #formatted = formatted.replace('\n    }', '\n        }')
     return formatted
 
 def get_holidays_from_calendarific(year, month, country_code):
@@ -85,6 +87,16 @@ def get_holiday_info_with_agent(question):
     ).invoke({'question': question}) 
     return response
 
+def get_session_history(session_id):
+    if session_id not in session_memories:
+        session_memories[session_id] = InMemoryChatMessageHistory()
+    return session_memories[session_id]
+
+def local_image_to_url(image_path):
+    with open(image_path, 'rb') as image_file:
+        base64_encoded_data = base64.b64encode(image_file.read()).decode('utf-8')
+    return f'data:image/jpeg;base64,{base64_encoded_data}'
+
 def generate_hw01(question):
     response = llm.invoke([question + f'{format_instructions}'])
     return format_json(JsonOutputParser().invoke(response))
@@ -92,13 +104,6 @@ def generate_hw01(question):
 def generate_hw02(question):
     response = get_holiday_info_with_agent(question)
     return format_json(JsonOutputParser().invoke(response['output']))
-
-session_memories = {}
-
-def get_session_history(session_id):
-    if session_id not in session_memories:
-        session_memories[session_id] = InMemoryChatMessageHistory()
-    return session_memories[session_id]
 
 def generate_hw03(question2, question3):
     holiday_agent_runnable = RunnableLambda(get_holiday_info_with_agent)
@@ -121,7 +126,21 @@ def generate_hw03(question2, question3):
     return format_json(JsonOutputParser().invoke(response['output']))
     
 def generate_hw04(question):
-    pass
+    prompt = PromptTemplate(
+        input_variables=["question"],
+        template="{question}"
+    )
+    text_message = HumanMessage(content=prompt.format(question=question))
+    image_url = local_image_to_url('baseball.png')
+    image_message = HumanMessage(
+        content=[
+            {'type': 'image_url', 'image_url': { 'url': image_url}}
+        ]
+    )
+    request_message = '答案請用此 JSON 格式呈現:{{ "Result": {{ "score": 5498 }} }}'
+    messages = [text_message, image_message, request_message]
+    response = llm.invoke(messages)
+    return format_json(JsonOutputParser().invoke(response))
     
 def demo(question):
     llm = AzureChatOpenAI(
@@ -143,4 +162,5 @@ def demo(question):
 
 #print(generate_hw01('2024年台灣10月紀念日有哪些?'))
 #print(generate_hw02('2024年台灣10月紀念日有哪些?'))
-print(generate_hw03('2024年台灣10月紀念日有哪些?', '根據先前的節日清單，這個節日{"date": "10-31", "name": "蔣公誕辰紀念日"}是否有在該月份清單?'))
+#print(generate_hw03('2024年台灣10月紀念日有哪些?', '根據先前的節日清單，這個節日{"date": "10-31", "name": "蔣公誕辰紀念日"}是否有在該月份清單?'))
+print(generate_hw04('請問中華台北的積分是多少'))
